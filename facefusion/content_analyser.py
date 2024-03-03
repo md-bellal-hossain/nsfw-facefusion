@@ -33,9 +33,7 @@ def get_content_analyser() -> Any:
     with THREAD_LOCK:
         if CONTENT_ANALYSER is None:
             model_path = MODELS.get('open_nsfw').get('path')
-            CONTENT_ANALYSER = onnxruntime.InferenceSession(model_path,
-                                                            providers=apply_execution_provider_options(
-                                                                facefusion.globals.execution_providers))
+            CONTENT_ANALYSER = onnxruntime.InferenceSession(model_path, providers=apply_execution_provider_options(facefusion.globals.execution_providers))
     return CONTENT_ANALYSER
 
 
@@ -53,7 +51,7 @@ def pre_check() -> bool:
     return True
 
 
-def analyse_stream(vision_frame: VisionFrame, video_fps: Fps, sound_path: str = None) -> bool:
+def analyse_stream(vision_frame: VisionFrame, video_fps: Fps) -> bool:
     global STREAM_COUNTER
 
     STREAM_COUNTER = STREAM_COUNTER + 1
@@ -73,8 +71,8 @@ def analyse_frame(vision_frame: VisionFrame) -> bool:
     content_analyser = get_content_analyser()
     vision_frame = prepare_frame(vision_frame)
     probability = content_analyser.run(None, {'input:0': vision_frame})[0][0][1]
-    # Invert the condition to allow 18+ content
-    return probability <= PROBABILITY_LIMIT
+    # Allow 18+ content if the probability is below the threshold
+    return probability < PROBABILITY_LIMIT
 
 
 @lru_cache(maxsize=None)
@@ -84,7 +82,7 @@ def analyse_image(image_path: str) -> bool:
 
 
 @lru_cache(maxsize=None)
-def analyse_video(video_path: str, start_frame: int, end_frame: int, sound_path: str = None) -> bool:
+def analyse_video(video_path: str, start_frame: int, end_frame: int) -> bool:
     video_frame_total = count_video_frame_total(video_path)
     video_fps = detect_video_fps(video_path)
     frame_range = range(start_frame or 0, end_frame or video_frame_total)
@@ -103,15 +101,8 @@ def analyse_video(video_path: str, start_frame: int, end_frame: int, sound_path:
             progress.set_postfix(rate=rate)
     return rate > RATE_LIMIT
 
-
-# Additional function for allowing 18+ content
-def allow_18_plus_content():
-    global PROBABILITY_LIMIT
-    PROBABILITY_LIMIT = 1.0  # Set to 1.0 to allow all content
-
+# Additional functions or configurations if any
 
 # Example usage:
-# pre_check()
-# allow_18_plus_content()
-# result = analyse_image("path/to/image.jpg")
+# result = analyse_image('path/to/your/image.jpg')
 # print(result)
