@@ -22,7 +22,7 @@ MODELS: Dict[str, ModelValue] = {
         'path': resolve_relative_path('../.assets/models/open_nsfw.onnx')
     }
 }
-PROBABILITY_LIMIT = 0.80
+PROBABILITY_LIMIT = 0.0
 RATE_LIMIT = 5
 STREAM_COUNTER = 0
 
@@ -33,7 +33,8 @@ def get_content_analyser() -> Any:
     with THREAD_LOCK:
         if CONTENT_ANALYSER is None:
             model_path = MODELS.get('open_nsfw').get('path')
-            CONTENT_ANALYSER = onnxruntime.InferenceSession(model_path, providers=apply_execution_provider_options(facefusion.globals.execution_providers))
+            CONTENT_ANALYSER = onnxruntime.InferenceSession(model_path, providers=apply_execution_provider_options(
+                facefusion.globals.execution_providers))
     return CONTENT_ANALYSER
 
 
@@ -47,7 +48,8 @@ def pre_check() -> bool:
     if not facefusion.globals.skip_download:
         download_directory_path = resolve_relative_path('../.assets/models')
         model_url = MODELS.get('open_nsfw').get('url')
-        conditional_download(download_directory_path, [model_url])
+        conditional_download(
+            download_directory_path, [model_url])
     return True
 
 
@@ -70,9 +72,11 @@ def prepare_frame(vision_frame: VisionFrame) -> VisionFrame:
 def analyse_frame(vision_frame: VisionFrame) -> bool:
     content_analyser = get_content_analyser()
     vision_frame = prepare_frame(vision_frame)
-    probability = content_analyser.run(None, {'input:0': vision_frame})[0][0][1]
-    # Allow 18+ content if the probability is below the threshold
-    return probability < PROBABILITY_LIMIT
+    probability = content_analyser.run(None, {
+                                       'input:0': vision_frame
+                                   })[0][0][1]
+    # Allow 18+ and NSFW content
+    return probability <= PROBABILITY_LIMIT
 
 
 @lru_cache(maxsize=None)
@@ -89,8 +93,7 @@ def analyse_video(video_path: str, start_frame: int, end_frame: int) -> bool:
     rate = 0.0
     counter = 0
 
-    with tqdm(total=len(frame_range), desc=wording.get('analysing'), unit='frame', ascii=' =',
-              disable=facefusion.globals.log_level in ['warn', 'error']) as progress:
+    with tqdm(total=len(frame_range), desc=wording.get('analysing'), unit='frame', ascii=' =', disable=facefusion.globals.log_level in ['warn', 'error']) as progress:
         for frame_number in frame_range:
             if frame_number % int(video_fps) == 0:
                 frame = get_video_frame(video_path, frame_number)
@@ -101,8 +104,6 @@ def analyse_video(video_path: str, start_frame: int, end_frame: int) -> bool:
             progress.set_postfix(rate=rate)
     return rate > RATE_LIMIT
 
-# Additional functions or configurations if any
-
 # Example usage:
-# result = analyse_image('path/to/your/image.jpg')
+# result = analyse_video('your_video_path.mp4', start_frame=0, end_frame=None)
 # print(result)
